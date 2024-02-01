@@ -110,6 +110,101 @@ def process_queue_export(file_path, bread_schemas):
 
 # Define other functions (remove_bad_data, initial_formatting, process_subrecords, move_files_to_hdfs, remove_local_files)
 
+def daily_load():
+    try:
+        logging.info("===========================================")
+        logging.info("Sync Start")
+        logging.info("Today: " + today)
+        logging.info("Sync Date: " + syncday[:4] + "-" + syncday[4:6] + "-" + syncday[6:])
+        recipients = ['teresa.nguyen@rbc.com', 'cbodatac@rbc.com']
+        start_time = time.time()
+        
+        # Initialize Spark session
+        spark = initialize_spark_session()
+        
+        # Load Bread schemas
+        bread_schemas = load_bread_schemas()
+        
+        # Check and validate files
+        validate_files()
+        
+        # Copy PGP files
+        copy_pgp_files()
+        
+        # Generate Parquet files
+        generate_parquet_files(bread_schemas)
+        
+        # Move Parquet files to HDFS
+        move_parquet_files_to_hdfs()
+        
+        # Delete copied PGP files
+        delete_copied_pgp_files()
+        
+        # Write successful log
+        write_successful_log()
+        
+        logging.info(f"Processed all Katabat & Bread files. Runtime: {(time.time() - start_time) / 60:.2f} minutes")
+        logging.info("===========================================")
+    except Exception as e:
+        handle_error(e)
+
+def validate_files():
+    """Check and validate files"""
+    mark_file_number, bread_pgp_file_number, katabat_pgp_file_number = check_files()
+    expect_file_num = 7 if katabat_pgp_file_number >= 5 else 6
+    
+    if mark_file_number < 6 and (bread_pgp_file_number + katabat_pgp_file_number) != expect_file_num:
+        raise ValueError("Mark files or PGP files weren't loaded correctly")
+
+def copy_pgp_files():
+    """Copy PGP files"""
+    filelist_pgp_bread = glob.glob(f'{filepath_bread}*{syncday}*.pgp')
+    filelist_pgp_katbat = glob.glob(f'{filepath_katbat}*{syncday}*.pgp')
+    
+    for file in filelist_pgp_bread + filelist_pgp_katbat:
+        shutil.copy(file, filepath_data)
+        logging.info(f"Copying PGP file: {file}")
+
+def generate_parquet_files(bread_schemas):
+    """Generate Parquet files"""
+    filelist_pgp_data = glob.glob(f'{filepath_data}*{syncday}*.pgp')
+    
+    for fn in filelist_pgp_data:
+        if 'QueueExport' in fn:
+            output = process_queue_export(fn, bread_schemas)
+            out = pa.Table.from_pandas(output)
+            pq.write_table(out, f'{src}/Data/CMC_QueueExport_QueueExport_{fn[-13:-5]}.parquet', use_deprecated_int96_timestamps=True)
+        else:
+            if 'AccountPlacementImportFile' in fn:
+                remove_bad_data(fn)
+            rec_df, name, snap_date = initial_formatting(fn)
+            process_subrecords(rec_df, name, rec_df['recordtype'].unique().tolist(), snap_date)
+            logging.info(f"{name} read completed")
+
+def move_parquet_files_to_hdfs():
+    """Move Parquet files to HDFS"""
+    filelist_parquet_data = glob.glob(f'{filepath_data}*{syncday}.parquet')
+    move_files_to_hdfs(filelist_parquet_data)
+
+def delete_copied_pgp_files():
+    """Delete copied PGP files"""
+    filelist_pgp_data = glob.glob(f'{filepath_data}*{syncday}*.pgp')
+    remove_local_files(filelist_pgp_data)
+
+def write_successful_log():
+    """Write successful log"""
+    status = "Successfully completed"
+    end = datetime.now()
+    writeLog(taskID=task_id, taskname=task_name, shellscript=shell_name,
+             timeperiod=None, taskStatus=status, taskMessage=None,
+             startTime=start, endTime=end, recordCount=None)
+
+def handle_error(e):
+    """Handle errors and log them"""
+    errLog = str(e)
+    record_count = None
+    errHandling(task_id, task_name, shell_name, errLog, record_count, recipients, start)
+
 def write_successful_log():
     """Write successful log"""
     try:
