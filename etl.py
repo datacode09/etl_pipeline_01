@@ -65,6 +65,40 @@ def delete_copied_pgp_files():
 def log_processing_status():
     logging.info("ETL Process completed successfully.")
 
+import os
+from config import *
+from pyspark.sql import SparkSession
+
+def check_data_paths_availability():
+    """
+    Checks the availability of source directories, files, and destination paths.
+    Raises an exception if any source or destination is not accessible.
+    """
+    # List of directories to check
+    directories_to_check = [filepath_bread, filepath_katbat, filepath_data]
+    
+    # Check each source directory
+    for directory in directories_to_check:
+        if not os.path.isdir(directory):
+            raise FileNotFoundError(f"Source directory not found: {directory}")
+    
+    # Optionally check for specific files in the source directories if needed
+    # Example: Check for .pgp or .mrk files existence in source directories
+    
+    # Check HDFS destination path accessibility (Example path)
+    hdfs_destination_path = "/prod/01559/app/RIE0/data_tde/COLDataFiles/"
+    # Assuming spark session is already created in config.py as 'spark'
+    try:
+        hdfs_access_test = spark._jvm.org.apache.hadoop.fs.Path(hdfs_destination_path)
+        fs = spark._jvm.org.apache.hadoop.fs.FileSystem.get(spark._jsc.hadoopConfiguration())
+        if not fs.exists(hdfs_access_test):
+            raise Exception(f"HDFS destination path not accessible: {hdfs_destination_path}")
+    except Exception as e:
+        raise Exception(f"Failed to access HDFS destination path: {e}")
+
+    print("All source and destination paths are available and accessible.")
+
+
 def daily_load():
     start_time = time.time()
     logging.info("Starting the ETL process.")
