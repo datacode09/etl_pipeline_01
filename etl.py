@@ -73,32 +73,37 @@ def log_processing_status():
 
 def check_data_paths_availability():
     """
-    Checks the availability of source directories, files, and destination paths.
-    Raises an exception if any source or destination is not accessible.
+    Checks the availability of source directories, files, and destination paths with retries.
+    Attempts up to 3 times with increasing wait time between retries.
     """
-    # List of directories to check
-    directories_to_check = [filepath_bread, filepath_katbat, filepath_data]
-    
-    # Check each source directory
-    for directory in directories_to_check:
-        if not os.path.isdir(directory):
-            raise FileNotFoundError(f"Source directory not found: {directory}")
-    
-    # Optionally check for specific files in the source directories if needed
-    # Example: Check for .pgp or .mrk files existence in source directories
-    
-    # Check HDFS destination path accessibility (Example path)
-    hdfs_destination_path = "/prod/01559/app/RIE0/data_tde/COLDataFiles/"
-    # Assuming spark session is already created in config.py as 'spark'
-    try:
-        hdfs_access_test = spark._jvm.org.apache.hadoop.fs.Path(hdfs_destination_path)
-        fs = spark._jvm.org.apache.hadoop.fs.FileSystem.get(spark._jsc.hadoopConfiguration())
-        if not fs.exists(hdfs_access_test):
-            raise Exception(f"HDFS destination path not accessible: {hdfs_destination_path}")
-    except Exception as e:
-        raise Exception(f"Failed to access HDFS destination path: {e}")
+    max_retries = 3
+    wait_time = 2  # Initial wait time in seconds, will double with each retry
 
-    print("All source and destination paths are available and accessible.")
+    for attempt in range(1, max_retries + 1):
+        try:
+            # Check each source directory
+            directories_to_check = [filepath_bread, filepath_katbat, filepath_data]
+            for directory in directories_to_check:
+                if not os.path.isdir(directory):
+                    raise FileNotFoundError(f"Source directory not found: {directory}")
+
+            # Check HDFS destination path accessibility (Example path)
+            hdfs_destination_path = "/prod/01559/app/RIE0/data_tde/COLDataFiles/"
+            hdfs_access_test = spark._jvm.org.apache.hadoop.fs.Path(hdfs_destination_path)
+            fs = spark._jvm.org.apache.hadoop.fs.FileSystem.get(spark._jsc.hadoopConfiguration())
+            if not fs.exists(hdfs_access_test):
+                raise Exception(f"HDFS destination path not accessible: {hdfs_destination_path}")
+
+            print("All source and destination paths are available and accessible.")
+            return  # Exit the function upon successful check
+        except Exception as e:
+            if attempt < max_retries:
+                print(f"Attempt {attempt} failed, retrying in {wait_time} seconds...")
+                time.sleep(wait_time)
+                wait_time *= 2  # Exponential backoff
+            else:
+                print(f"All attempts failed. Final attempt error: {e}")
+                raise
 
 
 def daily_load():
