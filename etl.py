@@ -67,17 +67,38 @@ def log_processing_status():
 
 def daily_load():
     start_time = time.time()
+    logging.info("Starting the ETL process.")
+    
     try:
+        logging.info("Step 1: Checking mark files.")
         check_mark_files()
+        logging.info("Completed: Mark files check successful.")
+
+        logging.info("Step 2: Copying PGP files.")
         copy_pgp_files()
+        logging.info("Completed: PGP files copied successfully.")
+
+        logging.info("Step 3: Generating Parquet files.")
         generate_parquet_files()
+        logging.info("Completed: Parquet files generated successfully.")
+
+        logging.info("Step 4: Moving Parquet files to HDFS.")
         move_parquet_to_hdfs()
+        logging.info("Completed: Parquet files moved to HDFS successfully.")
+
+        logging.info("Step 5: Deleting copied PGP files.")
         delete_copied_pgp_files()
-        log_processing_status()
-        logging.info("Total ETL runtime: {:.2f} minutes".format((time.time() - start_time) / 60))
+        logging.info("Completed: Copied PGP files deleted successfully.")
+
+        logging.info("ETL Process completed successfully.")
     except Exception as e:
-        logging.error(f"ETL process failed: {e}")
-        # Implement any additional error handling or notifications as required
+        logging.error(f"ETL process failed at {time.strftime('%Y-%m-%d %H:%M:%S')}: {str(e)}")
+        # It's helpful to re-raise the exception if the process is being monitored or further error handling is required
+        raise e
+    finally:
+        elapsed_time = time.time() - start_time
+        logging.info(f"Total ETL runtime: {elapsed_time:.2f} seconds.")
+
 
 if __name__ == "__main__":
     daily_load()
