@@ -5,6 +5,10 @@ import glob
 import logging
 import shutil
 import time
+import os
+from config import *
+from pyspark.sql import SparkSession
+
 
 def check_mark_files():
     logging.info("Checking mark files...")
@@ -65,9 +69,7 @@ def delete_copied_pgp_files():
 def log_processing_status():
     logging.info("ETL Process completed successfully.")
 
-import os
-from config import *
-from pyspark.sql import SparkSession
+
 
 def check_data_paths_availability():
     """
