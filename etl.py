@@ -106,6 +106,10 @@ def daily_load():
     logging.info("Starting the ETL process.")
     
     try:
+        logging.info("Checking data paths availability.")
+        check_data_paths_availability()
+        logging.info("Data paths availability check passed.")
+        
         logging.info("Step 1: Checking mark files.")
         check_mark_files()
         logging.info("Completed: Mark files check successful.")
