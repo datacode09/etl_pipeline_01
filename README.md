@@ -36,3 +36,50 @@ daily_load()
 Purpose: Orchestrates the entire ETL workflow.
 
 Details: This is the main function that orchestrates the execution of the ETL process. It sequentially calls the other functions in the script, managing the flow from initial checks of mark files, through the copying and processing of PGP files, to the final cleanup and logging steps. It includes error handling to catch and log any issues that arise during the process, ensuring robustness and reliability of the ETL workflow.
+
+
+Data Processing Utilities Documentation
+This document describes the functionalities of the utility processing functions defined in data_processing_utils.py, outlining their roles in the data processing workflow and their integration within the ETL process orchestrated by etl.py.
+
+Utility Function Descriptions
+process_queue_export(file_path)
+Purpose: Processes QueueExport files, transforming them into a structured DataFrame format suitable for Parquet conversion.
+
+Details: This function reads a CSV file using a predefined schema, adds a record type, and formats date columns. It's specifically designed to handle the unique format of QueueExport files.
+
+Used by ETL Function: generate_parquet_files()
+
+remove_baddata(file_path)
+Purpose: Cleans specific problematic data patterns in files before processing.
+
+Details: Targets and corrects known bad data strings that could cause issues during data loading or transformation, replacing them with corrected versions.
+
+Used by ETL Function: generate_parquet_files() (specifically for AccountPlacementImportFile processing)
+
+initial_formatting(file_path)
+Purpose: Performs initial formatting on data files to standardize their structure for further processing.
+
+Details: Reads a file and performs initial splitting and structuring based on predefined rules and schemas. It identifies file names and snapshot dates for record grouping.
+
+Used by ETL Function: generate_parquet_files()
+
+process_subrecords(df, file_name, record_list, dt)
+Purpose: Processes and partitions data files into subrecords, applying schemas and converting them to Parquet format.
+
+Details: This function takes a DataFrame and iterates through its records, applying the appropriate schema based on the file type and record type. It generates Parquet files for each subset of data.
+
+Used by ETL Function: generate_parquet_files()
+
+move_file_hdfs(filelist)
+Purpose: Moves generated Parquet files from the local filesystem to HDFS for distributed storage.
+
+Details: Utilizes PySpark and Hadoop's FileSystem API to transfer files from the local directory to HDFS, supporting large-scale data storage and processing.
+
+Used by ETL Function: move_parquet_to_hdfs()
+
+remove_local_file(filelist)
+Purpose: Deletes local files that have been successfully processed and moved to their final destination.
+
+Details: Cleans up the working directory by removing files that are no longer needed, freeing up disk space and maintaining a tidy processing environment.
+
+Used by ETL Function: delete_copied_pgp_files()
