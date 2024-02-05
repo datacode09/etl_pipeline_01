@@ -1,9 +1,9 @@
-ETL Process Documentation
+# ETL Process Documentation
 This document outlines the functionalities of the various functions within the etl.py script, which orchestrates an Extract, Transform, Load (ETL) process for handling and processing data files.
 
-Function Descriptions
-check_mark_files()
-Purpose: Verifies the presence of mark files in specified directories.
+## Function Descriptions
+### check_mark_files()
+**Purpose:** Verifies the presence of mark files in specified directories.
 
 Details: This function checks for .mrk files in both the Bread and Katabat directories to ensure that all expected data files are present before beginning the ETL process. It logs the count of these files and validates against an expected number. If the actual count is less than expected, the function raises an exception, indicating a potential issue with data delivery.
 
