@@ -105,44 +105,49 @@ def check_data_paths_availability():
                 print(f"All attempts failed. Final attempt error: {e}")
                 raise
 
+def save_checkpoint(stage):
+    with open('etl_checkpoint.txt', 'w') as f:
+        f.write(stage)
 
+def load_checkpoint():
+    try:
+        with open('etl_checkpoint.txt', 'r') as f:
+            return f.read().strip()
+    except FileNotFoundError:
+        return None  # No checkpoint found
+        
 def daily_load():
     start_time = time.time()
     logging.info("Starting the ETL process.")
     
-    try:
-        logging.info("Checking data paths availability.")
-        check_data_paths_availability()
-        logging.info("Data paths availability check passed.")
-        
-        logging.info("Step 1: Checking mark files.")
-        check_mark_files()
-        logging.info("Completed: Mark files check successful.")
+    # Load the last checkpoint, if it exists
+    last_checkpoint = load_checkpoint()
+    steps = [
+        ("check_mark_files", check_mark_files),
+        ("copy_pgp_files", copy_pgp_files),
+        ("generate_parquet_files", generate_parquet_files),
+        ("move_parquet_to_hdfs", move_parquet_to_hdfs),
+        ("delete_copied_pgp_files", delete_copied_pgp_files)
+    ]
+    
+    for step_name, step_function in steps:
+        if last_checkpoint is None or last_checkpoint == step_name or steps.index((step_name, step_function)) > steps.index((last_checkpoint, globals()[last_checkpoint])):
+            try:
+                logging.info(f"Starting {step_name}.")
+                step_function()
+                save_checkpoint(step_name)  # Save after successful completion of each step
+                logging.info(f"Completed {step_name} successfully.")
+            except Exception as e:
+                logging.error(f"ETL process failed during {step_name}: {e}")
+                raise  # Optionally, re-raise the exception for external handling
+            finally:
+                elapsed_time = time.time() - start_time
+                logging.info(f"ETL process stopped at {step_name}. Total runtime so far: {elapsed_time:.2f} seconds.")
+                return  # Stop the process if an exception occurs
 
-        logging.info("Step 2: Copying PGP files.")
-        copy_pgp_files()
-        logging.info("Completed: PGP files copied successfully.")
-
-        logging.info("Step 3: Generating Parquet files.")
-        generate_parquet_files()
-        logging.info("Completed: Parquet files generated successfully.")
-
-        logging.info("Step 4: Moving Parquet files to HDFS.")
-        move_parquet_to_hdfs()
-        logging.info("Completed: Parquet files moved to HDFS successfully.")
-
-        logging.info("Step 5: Deleting copied PGP files.")
-        delete_copied_pgp_files()
-        logging.info("Completed: Copied PGP files deleted successfully.")
-
-        logging.info("ETL Process completed successfully.")
-    except Exception as e:
-        logging.error(f"ETL process failed at {time.strftime('%Y-%m-%d %H:%M:%S')}: {str(e)}")
-        # It's helpful to re-raise the exception if the process is being monitored or further error handling is required
-        raise e
-    finally:
-        elapsed_time = time.time() - start_time
-        logging.info(f"Total ETL runtime: {elapsed_time:.2f} seconds.")
+    # If all steps complete successfully, clear the checkpoint
+    save_checkpoint("")  # Or delete the checkpoint file if preferred
+    logging.info("ETL Process completed successfully.")
 
 
 if __name__ == "__main__":
